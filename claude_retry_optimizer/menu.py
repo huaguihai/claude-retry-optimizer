@@ -530,6 +530,28 @@ class MenuSystem:
 
 def main():
     """主函数"""
+    import sys
+
+    # 检查命令行参数
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "update":
+            from .updater import run_update_command
+            run_update_command()
+            return
+        elif sys.argv[1] in ["-h", "--help"]:
+            console.print("\n[bold cyan]Claude Retry Optimizer[/bold cyan] - 优化 Claude Code 重试行为\n")
+            console.print("用法:")
+            console.print("  [cyan]claude-retry-optimizer[/cyan]        启动交互式菜单")
+            console.print("  [cyan]claude-retry-optimizer update[/cyan]  检查并更新到最新版本")
+            console.print("  [cyan]claude-retry-optimizer -h[/cyan]      显示此帮助信息")
+            console.print()
+            return
+        else:
+            console.print(f"[red]未知命令: {sys.argv[1]}[/red]")
+            console.print("使用 [cyan]claude-retry-optimizer -h[/cyan] 查看帮助")
+            sys.exit(1)
+
+    # 默认启动菜单
     try:
         menu = MenuSystem()
         menu.run()

@@ -28,7 +28,7 @@ pip install git+https://github.com/huaguihai/claude-retry-optimizer.git
 
 ## 🚀 使用方法
 
-安装后，直接运行：
+### 启动交互式菜单
 
 ```bash
 claude-retry-optimizer
@@ -38,6 +38,18 @@ claude-retry-optimizer
 
 ```bash
 python -m claude_retry_optimizer
+```
+
+### 检查并更新到最新版本
+
+```bash
+claude-retry-optimizer update
+```
+
+### 查看帮助
+
+```bash
+claude-retry-optimizer --help
 ```
 
 ## 📋 菜单说明
