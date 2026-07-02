@@ -3,6 +3,7 @@
 menu.py - 交互式菜单系统
 """
 
+import os
 import sys
 from typing import Optional
 
@@ -50,47 +51,54 @@ class MenuSystem:
 
     def show_status(self):
         """显示当前状态"""
+        from .binary import get_claude_version
+
         # 检测二进制
         self.binary_path = find_binary()
 
         table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("项目", style="cyan")
+        table.add_column("项目", style="cyan", width=12)
         table.add_column("状态")
 
         # 当前状态
         status = self.config_manager.get_status()
         status_color = "green" if "已配置" in status else "yellow"
-        table.add_row("当前状态", f"[{status_color}]{status}[/{status_color}]")
+        table.add_row("🎯 配置状态", f"[{status_color}]{status}[/{status_color}]")
 
         # Claude 路径
         if self.binary_path:
-            table.add_row("Claude 路径", self.binary_path)
+            table.add_row("📍 Claude 路径", self.binary_path)
         else:
-            table.add_row("Claude 路径", "[red]未找到[/red]")
+            table.add_row("📍 Claude 路径", "[red]未找到[/red]")
+
+        # Claude 版本
+        if self.binary_path:
+            version = get_claude_version()
+            if version:
+                table.add_row("📦 Claude 版本", version)
 
         # 备份状态
         if self.binary_path:
-            backup_status = "有备份 ✓" if has_backup(self.binary_path) else "无备份"
+            backup_status = "有备份 ✓" if has_backup(self.binary_path) else "未备份"
             backup_color = "green" if has_backup(self.binary_path) else "dim"
-            table.add_row("备份状态", f"[{backup_color}]{backup_status}[/{backup_color}]")
+            table.add_row("💾 备份状态", f"[{backup_color}]{backup_status}[/{backup_color}]")
 
         # 配置摘要
         config_summary = self.config_manager.get_config_summary()
         if config_summary:
-            table.add_row("当前配置", config_summary)
+            table.add_row("⚙️  当前配置", config_summary)
 
-        console.print(table)
+        console.print(Panel(table, border_style="cyan", title="系统状态", title_align="left"))
         console.print()
 
     def show_main_menu(self):
         """显示主菜单"""
         console.print("[bold]请选择操作：[/bold]")
-        console.print("  [cyan]1.[/cyan] 安装与更新")
-        console.print("  [cyan]2.[/cyan] 开始配置")
-        console.print("  [cyan]3.[/cyan] 修改配置")
-        console.print("  [cyan]4.[/cyan] 测试当前配置")
-        console.print("  [cyan]5.[/cyan] 卸载")
-        console.print("  [cyan]6.[/cyan] 退出")
+        console.print("  [cyan]1.[/cyan] 开始配置")
+        console.print("  [cyan]2.[/cyan] 修改配置")
+        console.print("  [cyan]3.[/cyan] 测试当前配置")
+        console.print("  [cyan]4.[/cyan] 卸载")
+        console.print("  [cyan]5.[/cyan] 退出")
         console.print()
 
     def run(self):
@@ -101,92 +109,19 @@ class MenuSystem:
             self.show_status()
             self.show_main_menu()
 
-            choice = Prompt.ask("请选择", choices=["1", "2", "3", "4", "5", "6"], default="6")
+            choice = Prompt.ask("请选择", choices=["1", "2", "3", "4", "5"], default="5")
 
             if choice == "1":
-                self.install_or_update()
-            elif choice == "2":
                 self.start_config()
-            elif choice == "3":
+            elif choice == "2":
                 self.modify_config()
-            elif choice == "4":
+            elif choice == "3":
                 self.test_config()
-            elif choice == "5":
+            elif choice == "4":
                 self.uninstall()
-            elif choice == "6":
+            elif choice == "5":
                 console.print("\n[cyan]再见！[/cyan]")
                 break
-
-    def install_or_update(self):
-        """安装与更新"""
-        console.print("\n[bold cyan]→ 安装与更新[/bold cyan]\n")
-
-        # 检测 Claude Code
-        if not self.binary_path:
-            console.print("[red]✗[/red] 未找到 Claude Code")
-            console.print("请先安装: [cyan]npm install -g @anthropic-ai/claude-code[/cyan]")
-            Prompt.ask("\n按回车返回")
-            return
-
-        console.print(f"[green]✓[/green] 找到 Claude Code: {self.binary_path}")
-
-        # 检查版本兼容性
-        console.print("[cyan]检查版本兼容性...[/cyan]")
-        is_compatible, current_version, error_msg = check_version_compatibility()
-
-        if current_version:
-            console.print(f"[green]✓[/green] 当前版本: {current_version}")
-        else:
-            console.print(f"[yellow]![/yellow] 无法获取版本信息")
-
-        if not is_compatible:
-            console.print()
-            console.print(Panel(
-                f"[yellow]⚠️  版本不兼容[/yellow]\n\n"
-                f"[red]{error_msg}[/red]\n\n"
-                f"[bold]此工具需要 Claude Code 2.1.191 或更高版本。[/bold]\n"
-                f"你的版本过低，优化将无法生效。\n\n"
-                f"[bold cyan]建议操作：[/bold cyan]\n"
-                f"  1. 升级到最新版本:\n"
-                f"     [cyan]npm update -g @anthropic-ai/claude-code[/cyan]\n\n"
-                f"  2. 或使用官方环境变量（不修改二进制）:\n"
-                f"     [cyan]export CLAUDE_CODE_RETRY_WATCHDOG=300000[/cyan]\n"
-                f"     （添加到 ~/.bashrc 或 ~/.zshrc）",
-                border_style="yellow",
-                title="版本不兼容",
-            ))
-            console.print()
-
-            if not Confirm.ask("是否仍要继续安装？（不推荐）", default=False):
-                return
-
-            console.print("\n[yellow]⚠️  警告: 强制继续可能导致优化失败[/yellow]")
-
-        # 检查二进制信息
-        info = get_binary_info(self.binary_path)
-        console.print(f"[green]✓[/green] 文件大小: {info['size']} 字节")
-
-        # 检查备份
-        if info['has_backup']:
-            console.print(f"[green]✓[/green] 已存在备份")
-        else:
-            console.print(f"[yellow]![/yellow] 尚未备份，安装时将自动创建")
-
-        console.print()
-        if not Confirm.ask("是否继续安装？", default=True):
-            return
-
-        # 创建备份
-        console.print("\n[cyan]正在创建备份...[/cyan]")
-        if not create_backup(self.binary_path):
-            console.print("[red]✗[/red] 创建备份失败")
-            Prompt.ask("\n按回车返回")
-            return
-        console.print("[green]✓[/green] 备份创建成功")
-
-        console.print("\n[green]✓[/green] 安装完成！")
-        console.print("接下来请选择 [cyan]2. 开始配置[/cyan] 来设置重试参数")
-        Prompt.ask("\n按回车返回")
 
     def show_config_menu(self) -> str:
         """显示配置子菜单
@@ -325,13 +260,72 @@ class MenuSystem:
 
         return True
 
+    def ensure_backup(self) -> bool:
+        """确保备份存在（自动创建）
+
+        Returns:
+            是否成功（备份已存在或创建成功）
+        """
+        if not self.binary_path:
+            console.print("[red]✗[/red] 未找到 Claude Code")
+            return False
+
+        if has_backup(self.binary_path):
+            return True  # 已有备份
+
+        # 自动创建备份
+        console.print("\n[cyan]💾 首次使用需要创建备份...[/cyan]")
+        console.print("[dim]（备份文件用于恢复原版，只创建一次）[/dim]\n")
+
+        # 检查版本兼容性
+        is_compatible, current_version, error_msg = check_version_compatibility()
+
+        if not is_compatible:
+            console.print(Panel(
+                f"[yellow]⚠️  版本不兼容[/yellow]\n\n"
+                f"[red]{error_msg}[/red]\n\n"
+                f"[bold]此工具需要 Claude Code 2.1.191 或更高版本。[/bold]\n"
+                f"优化可能无法生效。\n\n"
+                f"[bold cyan]建议操作：[/bold cyan]\n"
+                f"  1. 升级到最新版本:\n"
+                f"     [cyan]npm update -g @anthropic-ai/claude-code[/cyan]\n\n"
+                f"  2. 或使用官方环境变量（不修改二进制）:\n"
+                f"     [cyan]export CLAUDE_CODE_RETRY_WATCHDOG=300000[/cyan]",
+                border_style="yellow",
+                title="版本检查",
+            ))
+            console.print()
+
+            if not Confirm.ask("是否仍要继续？（不推荐）", default=False):
+                return False
+
+            console.print("\n[yellow]⚠️  警告: 强制继续可能导致优化失败[/yellow]\n")
+
+        # 创建备份
+        info = get_binary_info(self.binary_path)
+        size_mb = info['size'] / (1024 * 1024)
+        console.print(f"[cyan]正在备份二进制文件... ({size_mb:.1f} MB)[/cyan]")
+
+        if not create_backup(self.binary_path):
+            console.print("[red]✗[/red] 备份创建失败")
+            return False
+
+        console.print("[green]✓[/green] 备份创建成功\n")
+        return True
+
     def start_config(self):
         """开始配置"""
-        console.print("\n[bold cyan]→ 开始配置[/bold cyan]")
+        console.print("\n[bold cyan]→ 开始配置[/bold cyan]\n")
 
-        # 检查是否已备份
-        if not self.binary_path or not has_backup(self.binary_path):
-            console.print("\n[red]✗[/red] 请先执行 [cyan]1. 安装与更新[/cyan]")
+        # 检查 Claude Code
+        if not self.binary_path:
+            console.print("[red]✗[/red] 未找到 Claude Code")
+            console.print("请先安装: [cyan]npm install -g @anthropic-ai/claude-code[/cyan]")
+            Prompt.ask("\n按回车返回")
+            return
+
+        # 自动确保备份存在
+        if not self.ensure_backup():
             Prompt.ask("\n按回车返回")
             return
 
@@ -356,9 +350,18 @@ class MenuSystem:
 
         console.print()
         if success:
-            console.print("[bold green]✅ 配置完成！[/bold green]")
-            console.print("\n[dim]提示：新配置将在下次启动 Claude Code 时生效[/dim]")
-            console.print("[dim]如需立即生效，请重新打开终端或执行: source ~/.bashrc[/dim]")
+            console.print(Panel(
+                "[bold green]✅ 配置完成！[/bold green]\n\n"
+                "📊 [bold]优化摘要[/bold]\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "✓ 重试策略已优化\n"
+                "✓ 环境变量已设置\n"
+                "✓ 配置已保存\n\n"
+                "💡 [dim]提示：新配置将在下次启动 Claude Code 时生效[/dim]\n"
+                "[dim]   如需立即生效，请重新打开终端或执行: source ~/.bashrc[/dim]",
+                border_style="green",
+                title="配置成功",
+            ))
         else:
             console.print("[bold red]❌ 配置失败[/bold red]")
 
@@ -371,7 +374,12 @@ class MenuSystem:
         # 检查是否已配置
         config = self.config_manager.load()
         if not config or config.get("status") != "configured":
-            console.print("[yellow]![/yellow] 尚未配置，请先选择 [cyan]2. 开始配置[/cyan]")
+            console.print("[yellow]![/yellow] 尚未配置，请先选择 [cyan]1. 开始配置[/cyan]")
+            Prompt.ask("\n按回车返回")
+            return
+
+        # 自动确保备份存在（修改配置也需要修改二进制）
+        if not self.ensure_backup():
             Prompt.ask("\n按回车返回")
             return
 
@@ -403,7 +411,11 @@ class MenuSystem:
 
         console.print()
         if success:
-            console.print("[bold green]✅ 配置已更新！[/bold green]")
+            console.print(Panel(
+                "[bold green]✅ 配置已更新！[/bold green]\n\n"
+                "💡 [dim]提示：新配置将在下次启动 Claude Code 时生效[/dim]",
+                border_style="green",
+            ))
         else:
             console.print("[bold red]❌ 配置更新失败[/bold red]")
 
@@ -456,10 +468,27 @@ class MenuSystem:
 
         if not has_backup(self.binary_path):
             console.print("[yellow]![/yellow] 未找到备份文件，无法卸载")
+            console.print("[dim]（可能从未配置过，或备份已被手动删除）[/dim]")
             Prompt.ask("\n按回车返回")
             return
 
-        console.print("[yellow]警告：此操作将恢复到官方默认配置[/yellow]\n")
+        # 显示备份信息
+        info = get_binary_info(self.binary_path)
+        backup_path = info['path'] + '.orig'
+        backup_size = os.path.getsize(backup_path) / (1024 * 1024)
+
+        console.print(Panel(
+            f"[yellow]⚠️  确认卸载[/yellow]\n\n"
+            f"此操作将：\n"
+            f"  • 恢复原版 Claude Code\n"
+            f"  • 清理环境变量\n"
+            f"  • 删除配置文件\n"
+            f"  • 删除备份文件 ({backup_size:.1f} MB)\n\n"
+            f"[dim]卸载后可重新配置[/dim]",
+            border_style="yellow",
+        ))
+        console.print()
+
         if not Confirm.ask("确定要卸载吗？", default=False):
             return
 
@@ -488,8 +517,13 @@ class MenuSystem:
         remove_backup(self.binary_path)
         console.print("[green]✓[/green] 备份文件已删除")
 
-        console.print("\n[bold green]✅ 卸载完成！[/bold green]")
-        console.print("[dim]已恢复到官方默认配置[/dim]")
+        console.print()
+        console.print(Panel(
+            "[bold green]✅ 卸载完成！[/bold green]\n\n"
+            "已恢复到官方默认配置\n"
+            "你可以随时重新配置",
+            border_style="green",
+        ))
 
         Prompt.ask("\n按回车返回")
 
