@@ -20,6 +20,7 @@ from .binary import (
     remove_backup,
     read_binary,
     write_binary,
+    check_version_compatibility,
 )
 from .config import ConfigManager
 from .env import EnvManager
@@ -128,6 +129,38 @@ class MenuSystem:
             return
 
         console.print(f"[green]✓[/green] 找到 Claude Code: {self.binary_path}")
+
+        # 检查版本兼容性
+        console.print("[cyan]检查版本兼容性...[/cyan]")
+        is_compatible, current_version, error_msg = check_version_compatibility()
+
+        if current_version:
+            console.print(f"[green]✓[/green] 当前版本: {current_version}")
+        else:
+            console.print(f"[yellow]![/yellow] 无法获取版本信息")
+
+        if not is_compatible:
+            console.print()
+            console.print(Panel(
+                f"[yellow]⚠️  版本不兼容[/yellow]\n\n"
+                f"[red]{error_msg}[/red]\n\n"
+                f"[bold]此工具需要 Claude Code 2.1.191 或更高版本。[/bold]\n"
+                f"你的版本过低，优化将无法生效。\n\n"
+                f"[bold cyan]建议操作：[/bold cyan]\n"
+                f"  1. 升级到最新版本:\n"
+                f"     [cyan]npm update -g @anthropic-ai/claude-code[/cyan]\n\n"
+                f"  2. 或使用官方环境变量（不修改二进制）:\n"
+                f"     [cyan]export CLAUDE_CODE_RETRY_WATCHDOG=300000[/cyan]\n"
+                f"     （添加到 ~/.bashrc 或 ~/.zshrc）",
+                border_style="yellow",
+                title="版本不兼容",
+            ))
+            console.print()
+
+            if not Confirm.ask("是否仍要继续安装？（不推荐）", default=False):
+                return
+
+            console.print("\n[yellow]⚠️  警告: 强制继续可能导致优化失败[/yellow]")
 
         # 检查二进制信息
         info = get_binary_info(self.binary_path)

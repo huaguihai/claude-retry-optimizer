@@ -4,11 +4,12 @@ binary.py - Claude Code 二进制文件操作模块
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 
 def find_binary() -> Optional[str]:
@@ -150,3 +151,77 @@ def write_binary(binary_path: str, data: bytearray) -> bool:
     except OSError as e:
         print(f"写入二进制文件失败: {e}")
         return False
+
+
+def get_claude_version() -> Optional[str]:
+    """获取 Claude Code 版本号
+
+    Returns:
+        版本号字符串（如 "2.1.191"）或 None
+    """
+    try:
+        result = subprocess.run(
+            ["claude", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            # 输出格式: "2.1.191 (Claude Code)"
+            output = result.stdout.strip()
+            match = re.search(r'(\d+\.\d+\.\d+)', output)
+            if match:
+                return match.group(1)
+    except Exception:
+        pass
+    return None
+
+
+def compare_versions(version1: str, version2: str) -> int:
+    """比较两个版本号
+
+    Args:
+        version1: 版本号 1 (如 "2.1.191")
+        version2: 版本号 2 (如 "2.1.172")
+
+    Returns:
+        1 if version1 > version2
+        0 if version1 == version2
+        -1 if version1 < version2
+    """
+    def parse_version(v: str) -> Tuple[int, int, int]:
+        parts = v.split('.')
+        return (int(parts[0]), int(parts[1]), int(parts[2]))
+
+    try:
+        v1 = parse_version(version1)
+        v2 = parse_version(version2)
+
+        if v1 > v2:
+            return 1
+        elif v1 < v2:
+            return -1
+        else:
+            return 0
+    except Exception:
+        return 0
+
+
+def check_version_compatibility(min_version: str = "2.1.191") -> Tuple[bool, Optional[str], Optional[str]]:
+    """检查版本兼容性
+
+    Args:
+        min_version: 最低要求版本
+
+    Returns:
+        (是否兼容, 当前版本, 错误信息)
+    """
+    current_version = get_claude_version()
+
+    if current_version is None:
+        return False, None, "无法获取 Claude Code 版本"
+
+    if compare_versions(current_version, min_version) < 0:
+        return False, current_version, f"版本过低（当前 {current_version}，需要 {min_version}+）"
+
+    return True, current_version, None
