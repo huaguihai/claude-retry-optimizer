@@ -4,6 +4,7 @@ binary.py - Claude Code 二进制文件操作模块
 """
 
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -13,38 +14,67 @@ from typing import Optional, Tuple
 
 
 def find_binary() -> Optional[str]:
-    """查找 Claude Code 二进制文件路径"""
-    # 尝试 which claude
+    """查找 Claude Code 二进制文件路径（跨平台）"""
+
+    # 方法 1: 使用 shutil.which（跨平台）
     try:
-        result = subprocess.run(
-            ["which", "claude"], capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            path = os.path.realpath(result.stdout.strip())
+        claude_path = shutil.which("claude")
+        if claude_path:
+            path = os.path.realpath(claude_path)
             if os.path.isfile(path):
                 return path
     except Exception:
         pass
 
-    # 备用：查找 npm 全局安装目录
+    # 方法 2: 通过 npm root -g 查找
     try:
+        # Windows 上需要 shell=True 才能执行 .cmd 文件
         result = subprocess.run(
-            ["npm", "root", "-g"], capture_output=True, text=True, timeout=5
+            ["npm", "root", "-g"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            shell=(platform.system() == "Windows")
         )
         if result.returncode == 0:
             npm_root = result.stdout.strip()
-            candidates = [
-                os.path.join(npm_root, "@anthropic-ai/claude-code/bin/claude.exe"),
-                os.path.join(npm_root, "@anthropic-ai/claude-code-linux-x64/claude"),
-                os.path.join(npm_root, "@anthropic-ai/claude-code-linux-arm64/claude"),
-                os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-arm64/claude"),
-                os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-x64/claude"),
-            ]
+
+            # 根据平台构建候选路径
+            if platform.system() == "Windows":
+                candidates = [
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code-win32-x64", "claude.exe"),
+                ]
+            elif platform.system() == "Darwin":  # macOS
+                candidates = [
+                    os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-arm64/claude"),
+                    os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-x64/claude"),
+                ]
+            else:  # Linux
+                candidates = [
+                    os.path.join(npm_root, "@anthropic-ai/claude-code-linux-x64/claude"),
+                    os.path.join(npm_root, "@anthropic-ai/claude-code-linux-arm64/claude"),
+                ]
+
             for c in candidates:
                 if os.path.isfile(c):
                     return os.path.realpath(c)
     except Exception:
         pass
+
+    # 方法 3: Windows 特定路径（APPDATA）
+    if platform.system() == "Windows":
+        try:
+            appdata = os.environ.get("APPDATA")
+            if appdata:
+                candidates = [
+                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+                ]
+                for c in candidates:
+                    if os.path.isfile(c):
+                        return os.path.realpath(c)
+        except Exception:
+            pass
 
     return None
 
