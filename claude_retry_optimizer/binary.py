@@ -41,19 +41,34 @@ def find_binary() -> Optional[str]:
 
             # 根据平台构建候选路径
             if platform.system() == "Windows":
+                # Windows 上尝试多个可能的位置
+                npm_bin = os.path.dirname(npm_root)  # npm bin 目录（npm_root 的上一级）
+
                 candidates = [
+                    # 标准位置：node_modules/@anthropic-ai/claude-code/bin/claude.exe
                     os.path.join(npm_root, "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+
+                    # npm bin 目录中的包装器可能指向的位置
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code", "claude.exe"),
+
+                    # .bin 目录（某些 npm 版本）
+                    os.path.join(npm_root, ".bin", "claude.exe"),
+
+                    # win32 特定包
                     os.path.join(npm_root, "@anthropic-ai", "claude-code-win32-x64", "claude.exe"),
+
+                    # 直接在 npm bin 目录查找（通过 node_modules 找到）
+                    os.path.join(npm_bin, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
                 ]
             elif platform.system() == "Darwin":  # macOS
                 candidates = [
-                    os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-arm64/claude"),
-                    os.path.join(npm_root, "@anthropic-ai/claude-code-darwin-x64/claude"),
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code-darwin-arm64", "claude"),
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code-darwin-x64", "claude"),
                 ]
             else:  # Linux
                 candidates = [
-                    os.path.join(npm_root, "@anthropic-ai/claude-code-linux-x64/claude"),
-                    os.path.join(npm_root, "@anthropic-ai/claude-code-linux-arm64/claude"),
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code-linux-x64", "claude"),
+                    os.path.join(npm_root, "@anthropic-ai", "claude-code-linux-arm64", "claude"),
                 ]
 
             for c in candidates:
@@ -68,11 +83,50 @@ def find_binary() -> Optional[str]:
             appdata = os.environ.get("APPDATA")
             if appdata:
                 candidates = [
+                    # APPDATA/npm/node_modules 路径
                     os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "claude.exe"),
                 ]
                 for c in candidates:
                     if os.path.isfile(c):
                         return os.path.realpath(c)
+        except Exception:
+            pass
+
+    # 方法 4: 从 npm bin 目录通过 claude.cmd 找到真实路径（Windows）
+    if platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["npm", "bin", "-g"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                shell=True
+            )
+            if result.returncode == 0:
+                npm_bin = result.stdout.strip()
+                claude_cmd = os.path.join(npm_bin, "claude.cmd")
+
+                # 如果 claude.cmd 存在，读取它找到真实的 .exe 路径
+                if os.path.isfile(claude_cmd):
+                    try:
+                        with open(claude_cmd, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            # claude.cmd 通常包含类似这样的内容：
+                            # @"%~dp0\node_modules\@anthropic-ai\claude-code\bin\claude.exe" %*
+                            # 或 node "%~dp0\node_modules\@anthropic-ai\claude-code\bin\claude.js" %*
+
+                            # 提取路径
+                            import re
+                            matches = re.findall(r'["\']?%~dp0\\(.+?\.exe)["\']?', content)
+                            if matches:
+                                # %~dp0 表示 .cmd 文件所在目录
+                                relative_path = matches[0].replace('\\', os.sep)
+                                full_path = os.path.join(npm_bin, relative_path)
+                                if os.path.isfile(full_path):
+                                    return os.path.realpath(full_path)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
