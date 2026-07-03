@@ -240,18 +240,30 @@ def write_binary(binary_path: str, data: bytearray) -> bool:
         return False
 
 
-def get_claude_version() -> Optional[str]:
+def get_claude_version(binary_path: Optional[str] = None) -> Optional[str]:
     """获取 Claude Code 版本号
+
+    Args:
+        binary_path: Claude Code 二进制文件路径（可选）
+                    如果提供，使用该路径获取版本
+                    如果不提供，尝试使用 PATH 中的 claude 命令
 
     Returns:
         版本号字符串（如 "2.1.191"）或 None
     """
     try:
+        # 如果提供了二进制路径，使用它；否则使用 claude 命令
+        if binary_path and os.path.isfile(binary_path):
+            cmd = [binary_path, "--version"]
+        else:
+            cmd = ["claude", "--version"]
+
         result = subprocess.run(
-            ["claude", "--version"],
+            cmd,
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            shell=(platform.system() == "Windows" and not binary_path)
         )
         if result.returncode == 0:
             # 输出格式: "2.1.191 (Claude Code)"

@@ -71,9 +71,9 @@ class MenuSystem:
         else:
             table.add_row("📍 Claude 路径", "[red]未找到[/red]")
 
-        # Claude 版本
+        # Claude 版本（传入 binary_path）
         if self.binary_path:
-            version = get_claude_version()
+            version = get_claude_version(self.binary_path)
             if version:
                 table.add_row("📦 Claude 版本", version)
 
