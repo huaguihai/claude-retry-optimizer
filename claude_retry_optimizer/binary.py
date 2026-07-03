@@ -28,7 +28,24 @@ def find_binary() -> Optional[str]:
     except Exception:
         pass
 
-    # 方法 2: 通过 npm root -g 查找
+    # 方法 2: Windows 特定路径（APPDATA）- 提前到这里，因为不依赖 npm 命令
+    # npm 命令在某些环境可能很慢或超时
+    if platform.system() == "Windows":
+        try:
+            appdata = os.environ.get("APPDATA")
+            if appdata:
+                candidates = [
+                    # APPDATA/npm/node_modules 路径
+                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
+                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "claude.exe"),
+                ]
+                for c in candidates:
+                    if os.path.isfile(c):
+                        return os.path.realpath(c)
+        except Exception:
+            pass
+
+    # 方法 3: 通过 npm root -g 查找
     try:
         # Windows 上需要 shell=True 才能执行 .cmd 文件
         result = subprocess.run(
@@ -78,22 +95,6 @@ def find_binary() -> Optional[str]:
                     return os.path.realpath(c)
     except Exception:
         pass
-
-    # 方法 3: Windows 特定路径（APPDATA）
-    if platform.system() == "Windows":
-        try:
-            appdata = os.environ.get("APPDATA")
-            if appdata:
-                candidates = [
-                    # APPDATA/npm/node_modules 路径
-                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"),
-                    os.path.join(appdata, "npm", "node_modules", "@anthropic-ai", "claude-code", "claude.exe"),
-                ]
-                for c in candidates:
-                    if os.path.isfile(c):
-                        return os.path.realpath(c)
-        except Exception:
-            pass
 
     # 方法 4: 从 npm bin 目录通过 claude.cmd 找到真实路径（Windows）
     if platform.system() == "Windows":
