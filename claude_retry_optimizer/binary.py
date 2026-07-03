@@ -17,11 +17,13 @@ def find_binary() -> Optional[str]:
     """查找 Claude Code 二进制文件路径（跨平台）"""
 
     # 方法 1: 使用 shutil.which（跨平台）
+    # 注意：Windows 上可能返回 .cmd 包装器，我们需要跳过它找真正的 .exe
     try:
         claude_path = shutil.which("claude")
         if claude_path:
             path = os.path.realpath(claude_path)
-            if os.path.isfile(path):
+            # 如果是 .cmd 或 .bat 包装器（Windows），跳过，继续尝试其他方法
+            if os.path.isfile(path) and not path.lower().endswith(('.cmd', '.bat')):
                 return path
     except Exception:
         pass
